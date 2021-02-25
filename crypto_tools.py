@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 
 from M2Crypto import EVP
 from binascii import hexlify, unhexlify
@@ -17,12 +19,7 @@ def m2_encrypt(plaintext, key, iv, key_as_bytes=False, padding=True):
 
 
 if __name__ == "__main__":
-   print("AES encrypt and ")
-
-   #if len(sys.argv) != 3:
-   #    print("you need input like this:")
-   #    print("./m2crypto_aes.py key_string data_string")
-   #    exit()
+   print("Crypto tool for aes des sm4.")
 
    enc = 1
    dec = 0
