@@ -8,16 +8,6 @@ import sys
 from gmssl.sm4 import CryptSM4, SM4_ENCRYPT, SM4_DECRYPT
 
 
-def m2_encrypt(plaintext, key, iv, key_as_bytes=False, padding=True):
-   print("key")
-   print(key)
-   cipher = EVP.Cipher(alg="aes_128_ecb", key=key, iv=iv,
-                       key_as_bytes=key_as_bytes, padding=padding, op=1)
-   cipher.update(plaintext)
-
-   cipher.final()
-
-
 if __name__ == "__main__":
    print("Crypto tool for aes des sm4.")
 
@@ -69,9 +59,7 @@ if __name__ == "__main__":
             print("cipher : " + str(out[:len(data)]))
             print("------------ end --------------------")
             continue
-         # m2_encrypt(data, key, iv, False, False)
          cipher = EVP.Cipher(alg=alg, key=unhexlify(key), iv=None, op=enc)
-         # out = hexlify(cipher.update(unhexlify(data)))
          out = bytes.hex(cipher.update(unhexlify(data)))
          cipher.final()
          print("cipher : " + str(out))
