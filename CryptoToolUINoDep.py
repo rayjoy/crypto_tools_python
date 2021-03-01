@@ -10,6 +10,21 @@ from binascii import hexlify, unhexlify
 import sys
 from pysmx.SM4 import Sm4, ENCRYPT, DECRYPT
 
+'''
+import ctypes
+
+# Query DPI Awareness (Windows 10 and 8)
+awareness = ctypes.c_int()
+errorCode = ctypes.windll.shcore.GetProcessDpiAwareness(0, ctypes.byref(awareness))
+print(awareness.value)
+# Set DPI Awareness  (Windows 10 and 8)
+errorCode = ctypes.windll.shcore.SetProcessDpiAwareness(2)
+# the argument is the awareness level, which can be 0, 1 or 2:
+# for 1-to-1 pixel control I seem to need it to be non-zero (I'm using level 2)
+# Set DPI Awareness  (Windows 7 and Vista)
+success = ctypes.windll.user32.SetProcessDPIAware()
+# behaviour on later OSes is undefined, although when I run it on my Windows 10 machine, it seems to work with effects identical to SetProcessDpiAwareness(1
+'''
 
 ENC = 1
 DEC = 0
@@ -72,17 +87,21 @@ def SymmCryptoCompute(alg, mode, op, key, iv, data):
 
     if alg == 'aes':
         if op == ENC:
-            if mode == 'ecb':
-                aes = pyaes.AESModeOfOperationECB(unhexlify(key))
-            elif mode == 'cbc':
-                aes = pyaes.AESModeOfOperationCBC(unhexlify(key), unhexlify(iv))
-            out = bytes.hex(aes.encrypt(unhexlify(data)))
+            for i in range(int(len(data) / 32)):
+                if mode == 'ecb':
+                    aes = pyaes.AESModeOfOperationECB(unhexlify(key))
+                elif mode == 'cbc':
+                    aes = pyaes.AESModeOfOperationCBC(unhexlify(key), unhexlify(iv))
+                iv = bytes.hex(aes.encrypt(unhexlify(data[i*32:(i+1)*32])))
+                out += iv
         elif op == DEC:
-            if mode == 'ecb':
-                aes = pyaes.AESModeOfOperationECB(unhexlify(key))
-            elif mode == 'cbc':
-                aes = pyaes.AESModeOfOperationCBC(unhexlify(key), unhexlify(iv))
-            out = bytes.hex(aes.decrypt(unhexlify(data)))
+            for i in range(int(len(data) / 32)):
+                if mode == 'ecb':
+                    aes = pyaes.AESModeOfOperationECB(unhexlify(key))
+                elif mode == 'cbc':
+                    aes = pyaes.AESModeOfOperationCBC(unhexlify(key), unhexlify(iv))
+                iv = data[i*32:(i+1)*32]
+                out += bytes.hex(aes.decrypt(unhexlify(data[i*32:(i+1)*32])))
 
     elif alg == 'des' or alg == '3des2key' or alg == '3des3key':
         if alg == 'des':
@@ -168,6 +187,10 @@ class TextFrame(wx.Frame):
         self.outdataText = wx.TextCtrl(panel, -1, "",
                                      size=(250, 390), pos=(325, 40),
                                      style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
+                                
+    def OnExit(self, event):
+        """Close the frame, terminating the application."""
+        self.Close(True)
 
     def OnClickEnc(self, event):
         key = self.keyText.GetLineText(0)
