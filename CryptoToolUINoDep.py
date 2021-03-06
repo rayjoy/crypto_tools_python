@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
-"""Hello, wxPython! program."""
+"""
+Crypto Tool
+"""
 
 
 import wx
@@ -10,12 +12,13 @@ from binascii import hexlify, unhexlify
 import sys
 from pysmx.SM4 import Sm4, ENCRYPT, DECRYPT
 
-'''
 import ctypes
+from wx.core import ID_ANY
 
 # Query DPI Awareness (Windows 10 and 8)
 awareness = ctypes.c_int()
-errorCode = ctypes.windll.shcore.GetProcessDpiAwareness(0, ctypes.byref(awareness))
+errorCode = ctypes.windll.shcore.GetProcessDpiAwareness(
+    0, ctypes.byref(awareness))
 print(awareness.value)
 # Set DPI Awareness  (Windows 10 and 8)
 errorCode = ctypes.windll.shcore.SetProcessDpiAwareness(2)
@@ -23,8 +26,10 @@ errorCode = ctypes.windll.shcore.SetProcessDpiAwareness(2)
 # for 1-to-1 pixel control I seem to need it to be non-zero (I'm using level 2)
 # Set DPI Awareness  (Windows 7 and Vista)
 success = ctypes.windll.user32.SetProcessDPIAware()
-# behaviour on later OSes is undefined, although when I run it on my Windows 10 machine, it seems to work with effects identical to SetProcessDpiAwareness(1
-'''
+# behaviour on later OSes is undefined,
+# although when I run it on my Windows 10 machine, 
+# it seems to work with effects identical to SetProcessDpiAwareness(1
+
 
 ENC = 1
 DEC = 0
@@ -35,7 +40,7 @@ modeList = ['ecb', 'cbc']
 def check_data_format(alg, mode, key, iv, data):
     if alg == 'aes':
         if mode == 'cbc' and len(iv) != 32:
-                return False, 'iv length must be 16, please input right iv.'
+            return False, 'iv length must be 16, please input right iv.'
         if len(key) != 32:
             return False, 'key length must be 16, please input right key.'
         if len(data) % 32 != 0:
@@ -64,7 +69,7 @@ def check_data_format(alg, mode, key, iv, data):
             return False, 'key length must be 24, please input right key.'
         if len(data) % 16 != 0:
             return False, 'data length must be 8 * N, please input right data.'
-    
+
     elif alg == 'sm4':
         if mode == 'cbc' and len(iv) != 32:
             return False, 'iv length must be 16, please input right iv.'
@@ -79,7 +84,7 @@ def check_data_format(alg, mode, key, iv, data):
 def SymmCryptoCompute(alg, mode, op, key, iv, data):
     if alg not in algList:
         return False, "algorithm does't support."
-    ret, message = check_data_format(alg, mode, key, iv, data)    
+    ret, message = check_data_format(alg, mode, key, iv, data)
     if ret == False:
         return ret, message
 
@@ -91,7 +96,8 @@ def SymmCryptoCompute(alg, mode, op, key, iv, data):
                 if mode == 'ecb':
                     aes = pyaes.AESModeOfOperationECB(unhexlify(key))
                 elif mode == 'cbc':
-                    aes = pyaes.AESModeOfOperationCBC(unhexlify(key), unhexlify(iv))
+                    aes = pyaes.AESModeOfOperationCBC(
+                        unhexlify(key), unhexlify(iv))
                 iv = bytes.hex(aes.encrypt(unhexlify(data[i*32:(i+1)*32])))
                 out += iv
         elif op == DEC:
@@ -99,7 +105,8 @@ def SymmCryptoCompute(alg, mode, op, key, iv, data):
                 if mode == 'ecb':
                     aes = pyaes.AESModeOfOperationECB(unhexlify(key))
                 elif mode == 'cbc':
-                    aes = pyaes.AESModeOfOperationCBC(unhexlify(key), unhexlify(iv))
+                    aes = pyaes.AESModeOfOperationCBC(
+                        unhexlify(key), unhexlify(iv))
                 iv = data[i*32:(i+1)*32]
                 out += bytes.hex(aes.decrypt(unhexlify(data[i*32:(i+1)*32])))
 
@@ -109,9 +116,11 @@ def SymmCryptoCompute(alg, mode, op, key, iv, data):
         else:
             des = pyDes.triple_des
         if mode == 'ecb':
-            k = des(unhexlify(key), pyDes.ECB, None, pad=None, padmode=pyDes.PAD_NORMAL)
+            k = des(unhexlify(key), pyDes.ECB, None,
+                    pad=None, padmode=pyDes.PAD_NORMAL)
         elif mode == 'cbc':
-            k = des(unhexlify(key), pyDes.CBC, unhexlify(iv), pad=None, padmode=pyDes.PAD_NORMAL)
+            k = des(unhexlify(key), pyDes.CBC, unhexlify(
+                iv), pad=None, padmode=pyDes.PAD_NORMAL)
         if op == ENC:
             out = bytes.hex(k.encrypt(unhexlify(data)))
         elif op == DEC:
@@ -126,17 +135,90 @@ def SymmCryptoCompute(alg, mode, op, key, iv, data):
         if mode == 'ecb':
             out = bytes.hex(bytes(sm4.sm4_crypt_ecb(unhexlify(data))))
         elif mode == 'cbc':
-            out = bytes.hex(bytes(sm4.sm4_crypt_cbc(unhexlify(iv), unhexlify(data))))
+            out = bytes.hex(bytes(sm4.sm4_crypt_cbc(
+                unhexlify(iv), unhexlify(data))))
     return True, str(out)
 
 
 class TextFrame(wx.Frame):
 
-    def __init__(self, *args, **kw):
-        wx.Frame.__init__(self, None, -1, 'Crypto Tool',
-                          size=(600, 600))
+    def __init__(self, parent, title):
+        super(TextFrame, self).__init__(parent, id=ID_ANY, title='Crypto Tool',
+                                        size=(800, 960))
+        self.InitStatusBar()
+        self.InitUI()        
+        self.Centre()
+        self.Show()
+
+    def InitUI(self):
         panel = wx.Panel(self, -1)
 
+        self.keyLabel = wx.StaticText(panel, label="密钥:")
+        self.keyText = wx.TextCtrl(
+            panel, size=(-1, 40), style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
+        self.keyText.SetInsertionPoint(0)
+
+        self.ivLabel = wx.StaticText(panel, label="IV:")
+        self.ivText = wx.TextCtrl(
+            panel, size=(-1, 40), style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
+        self.keyText.SetInsertionPoint(0)
+
+        self.plainLabel = wx.StaticText(panel, label="明文:")
+        self.plainText = wx.TextCtrl(
+            panel, size=(-1, 100), style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
+
+        self.cipherLabel = wx.StaticText(panel, label="密文:")
+        self.cipherText = wx.TextCtrl(
+            panel, size=(-1, 100), style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
+
+        self.outdataLabel = wx.StaticText(panel, label="输出信息:")
+        self.outdataText = wx.TextCtrl(
+            panel, size=(-1, 400), style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
+
+        fgs = wx.FlexGridSizer(6, 2, 9, 25)
+        fgs.AddMany([(self.keyLabel), (self.keyText, 1, wx.EXPAND),
+                     (self.ivLabel), (self.ivText, 1, wx.EXPAND),
+                     (self.plainLabel), (self.plainText, 1, wx.EXPAND),
+                     (self.cipherLabel), (self.cipherText, 1, wx.EXPAND),
+                     (self.outdataLabel), (self.outdataText, 1, wx.EXPAND)])
+        fgs.AddGrowableRow(2, 1)
+        fgs.AddGrowableRow(3, 1)
+        fgs.AddGrowableRow(4, 1)
+        fgs.AddGrowableCol(1, 1)
+
+        self.algList = ['aes', 'des', '3des2key', '3des3key', 'sm4']
+        self.algLabel = wx.StaticText(panel, label="算法:")
+        self.algChoice = wx.Choice(panel, choices=self.algList)
+        self.algChoice.SetSelection(0)
+
+        self.modeList = ['ecb', 'cbc']
+        self.modeLabel = wx.StaticText(panel, label="模式:")
+        self.modeChoice = wx.Choice(panel, choices=self.modeList)
+        self.modeChoice.SetSelection(0)
+
+        self.encButton = wx.Button(panel, label="加密")
+        self.Bind(wx.EVT_BUTTON, self.OnClickEnc, self.encButton)
+        self.encButton.SetDefault()
+
+        self.decButton = wx.Button(panel, label="解密")
+        self.Bind(wx.EVT_BUTTON, self.OnClickDec, self.decButton)
+        self.decButton.SetDefault()
+
+        choiceBox = wx.BoxSizer(wx.HORIZONTAL)
+        choiceBox.Add(self.algLabel, flag=wx.ALL, border=15)
+        choiceBox.Add(self.algChoice, flag=wx.ALL, border=15)
+        choiceBox.Add(self.modeLabel, flag=wx.ALL, border=15)
+        choiceBox.Add(self.modeChoice, flag=wx.ALL, border=15)
+        choiceBox.Add(self.encButton, flag=wx.ALL, border=15)
+        choiceBox.Add(self.decButton, flag=wx.ALL, border=15)
+
+        hbox = wx.BoxSizer(wx.VERTICAL)
+        hbox.Add(fgs, proportion=1, flag=wx.ALL | wx.EXPAND, border=15)
+        hbox.Add(choiceBox, proportion=1, flag=wx.ALL | wx.EXPAND, border=15)
+
+        panel.SetSizer(hbox)
+
+    def InitStatusBar(self):
         self.statusbar = self.CreateStatusBar()
         self.statusbar.SetFieldsCount(3)
         self.statusbar.SetStatusWidths([-2, -5, -1])
@@ -144,50 +226,6 @@ class TextFrame(wx.Frame):
         self.statusbar.SetStatusText("zhangqinlei@gmail.com", 1)
         self.statusbar.SetStatusText("By ZQL", 2)
 
-        self.keyLabel = wx.StaticText(panel, -1, "密钥:", pos=[15, 13])
-        self.keyText = wx.TextCtrl(panel, -1, "",
-                                   size=(250, -1), pos=[55, 10])
-        self.keyText.SetInsertionPoint(0)
-
-        self.ivLabel = wx.StaticText(panel, -1, "IV:", pos=[15, 57])
-        self.ivText = wx.TextCtrl(panel, -1, "",
-                                  size=(250, -1), pos=[55, 55])
-        self.keyText.SetInsertionPoint(0)
-
-        self.plainLabel = wx.StaticText(panel, -1, "明文:", pos=[15, 100])
-        self.plainText = wx.TextCtrl(panel, -1, "",
-                                     size=(250, 150), pos=(55, 100),
-                                     style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
-
-        self.cipherLabel = wx.StaticText(panel, -1, "密文:", pos=[15, 283])
-        self.cipherText = wx.TextCtrl(panel, -1, "",
-                                      size=(250, 150), pos=(55, 280),
-                                      style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
-
-        self.algList = ['aes', 'des', '3des2key', '3des3key', 'sm4']
-        self.algLabel = wx.StaticText(panel, -1, "算法:", (15, 458))
-        self.algChoice = wx.Choice(panel, -1, (50, 455), choices=self.algList)
-        self.algChoice.SetSelection(0)
-
-        self.modeList = ['ecb', 'cbc']
-        self.modeLabel = wx.StaticText(panel, -1, "模式:", (165, 458))
-        self.modeChoice = wx.Choice(panel, -1, (200, 455),
-                                    choices=self.modeList)
-        self.modeChoice.SetSelection(0)
-
-        self.encButton = wx.Button(panel, -1, "加密", pos=(15, 500))
-        self.Bind(wx.EVT_BUTTON, self.OnClickEnc, self.encButton)
-        self.encButton.SetDefault()
-
-        self.decButton = wx.Button(panel, -1, "解密", pos=(105, 500))
-        self.Bind(wx.EVT_BUTTON, self.OnClickDec, self.decButton)
-        self.decButton.SetDefault()
-
-        self.outdataLabel = wx.StaticText(panel, -1, "输出信息:", (325, 12))
-        self.outdataText = wx.TextCtrl(panel, -1, "",
-                                     size=(250, 390), pos=(325, 40),
-                                     style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
-                                
     def OnExit(self, event):
         """Close the frame, terminating the application."""
         self.Close(True)
