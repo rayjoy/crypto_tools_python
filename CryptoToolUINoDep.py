@@ -106,7 +106,7 @@ def SymmCryptoAES(alg, mode, op, key, iv, data):
                     unhexlify(key), unhexlify(iv))
             elif mode == 'cfb':
                 aes = pyaes.AESModeOfOperationCFB(
-                    unhexlify(key), unhexlify(iv))
+                    unhexlify(key), unhexlify(iv), segment_size=16)
             elif mode == 'ofb':
                 aes = pyaes.AESModeOfOperationOFB(
                     unhexlify(key), unhexlify(iv))
@@ -131,7 +131,7 @@ def SymmCryptoAES(alg, mode, op, key, iv, data):
                     unhexlify(key), unhexlify(iv))
             elif mode == 'cfb':
                 aes = pyaes.AESModeOfOperationCFB(
-                    unhexlify(key), unhexlify(iv))
+                    unhexlify(key), unhexlify(iv), segment_size=16)
             elif mode == 'ofb':
                 aes = pyaes.AESModeOfOperationOFB(
                     unhexlify(key), unhexlify(iv))
