@@ -19,7 +19,7 @@ from wx.core import ID_ANY
 awareness = ctypes.c_int()
 errorCode = ctypes.windll.shcore.GetProcessDpiAwareness(
     0, ctypes.byref(awareness))
-print(awareness.value)
+# print(awareness.value)
 # Set DPI Awareness  (Windows 10 and 8)
 errorCode = ctypes.windll.shcore.SetProcessDpiAwareness(2)
 # the argument is the awareness level, which can be 0, 1 or 2:
@@ -27,19 +27,32 @@ errorCode = ctypes.windll.shcore.SetProcessDpiAwareness(2)
 # Set DPI Awareness  (Windows 7 and Vista)
 success = ctypes.windll.user32.SetProcessDPIAware()
 # behaviour on later OSes is undefined,
-# although when I run it on my Windows 10 machine, 
+# although when I run it on my Windows 10 machine,
 # it seems to work with effects identical to SetProcessDpiAwareness(1
 
 
 ENC = 1
 DEC = 0
 algList = ['aes', 'des', '3des2key', '3des3key', 'sm4']
-modeList = ['ecb', 'cbc']
+modeList = ['ecb', 'cbc', 'cfb', 'ofb']
+withoutECBModeList = ['cbc', 'cfb', 'ofb']
+
+
+def _string_to_bytes(text):
+    if isinstance(text, bytes):
+        return text
+    return [ord(c) for c in text]
+
+# In Python 3, we return bytes
+
+
+def _bytes_to_string(binary):
+    return bytes(binary)
 
 
 def check_data_format(alg, mode, key, iv, data):
     if alg == 'aes':
-        if mode == 'cbc' and len(iv) != 32:
+        if mode in withoutECBModeList and len(iv) != 32:
             return False, 'iv length must be 16, please input right iv.'
         if len(key) != 32:
             return False, 'key length must be 16, please input right key.'
@@ -47,7 +60,7 @@ def check_data_format(alg, mode, key, iv, data):
             return False, 'data length must be 16 * N, please input right data.'
 
     elif alg == 'des':
-        if mode == 'cbc' and len(iv) != 16:
+        if mode in withoutECBModeList and len(iv) != 16:
             return False, 'iv length must be 8, please input right iv.'
         if len(key) != 16:
             return False, 'key length must be 8, please input right key.'
@@ -55,7 +68,7 @@ def check_data_format(alg, mode, key, iv, data):
             return False, 'data length must be 8 * N, please input right data.'
 
     elif alg == '3des2key':
-        if mode == 'cbc' and len(iv) != 16:
+        if mode in withoutECBModeList and len(iv) != 16:
             return False, 'iv length must be 8, please input right iv.'
         if len(key) != 32:
             return False, 'key length must be 16, please input right key.'
@@ -63,7 +76,7 @@ def check_data_format(alg, mode, key, iv, data):
             return False, 'data length must be 8 * N, please input right data.'
 
     elif alg == '3des3key':
-        if mode == 'cbc' and len(iv) != 16:
+        if mode in withoutECBModeList and len(iv) != 16:
             return False, 'iv length must be 8, please input right iv.'
         if len(key) != 48:
             return False, 'key length must be 24, please input right key.'
@@ -71,7 +84,7 @@ def check_data_format(alg, mode, key, iv, data):
             return False, 'data length must be 8 * N, please input right data.'
 
     elif alg == 'sm4':
-        if mode == 'cbc' and len(iv) != 32:
+        if mode in withoutECBModeList and len(iv) != 32:
             return False, 'iv length must be 16, please input right iv.'
         if len(key) != 32:
             return False, 'key length must be 16, please input right key.'
@@ -81,6 +94,140 @@ def check_data_format(alg, mode, key, iv, data):
     return True, 'data format correct'
 
 
+def SymmCryptoAES(alg, mode, op, key, iv, data):
+    out = ''
+
+    if op == ENC:
+        for i in range(int(len(data) / 32)):
+            if mode == 'ecb':
+                aes = pyaes.AESModeOfOperationECB(unhexlify(key))
+            elif mode == 'cbc':
+                aes = pyaes.AESModeOfOperationCBC(
+                    unhexlify(key), unhexlify(iv))
+            elif mode == 'cfb':
+                aes = pyaes.AESModeOfOperationCFB(
+                    unhexlify(key), unhexlify(iv))
+            elif mode == 'ofb':
+                aes = pyaes.AESModeOfOperationOFB(
+                    unhexlify(key), unhexlify(iv))
+
+            datab = unhexlify(data[i*32:(i+1)*32])
+            encdatab = aes.encrypt(datab)
+            if mode != 'ofb':
+                outhex = bytes.hex(encdatab)
+                iv = outhex
+            else:
+                ivb = [(x ^ p) for (x, p) in zip(datab, encdatab)]
+                iv = bytes.hex(_bytes_to_string(ivb))
+                outhex = bytes.hex(encdatab)
+            out += outhex
+
+    elif op == DEC:
+        for i in range(int(len(data) / 32)):
+            if mode == 'ecb':
+                aes = pyaes.AESModeOfOperationECB(unhexlify(key))
+            elif mode == 'cbc':
+                aes = pyaes.AESModeOfOperationCBC(
+                    unhexlify(key), unhexlify(iv))
+            elif mode == 'cfb':
+                aes = pyaes.AESModeOfOperationCFB(
+                    unhexlify(key), unhexlify(iv))
+            elif mode == 'ofb':
+                aes = pyaes.AESModeOfOperationOFB(
+                    unhexlify(key), unhexlify(iv))
+
+            if mode != 'ofb':
+                iv = data[i*32:(i+1)*32]
+                out += bytes.hex(aes.decrypt(
+                    unhexlify(data[i*32:(i+1)*32])))
+            else:
+                datab = unhexlify(data[i*32:(i+1)*32])
+                encdatab = aes.decrypt(datab)
+                ivb = []
+                for i in range(len(encdatab)):
+                    ivb.append(datab[i] ^ encdatab[i])
+                iv = bytes.hex(_bytes_to_string(ivb))
+                outhex = bytes.hex(encdatab)
+                out += outhex
+    return out
+
+
+def SymmCryptoSM4(alg, mode, op, key, iv, data):
+    sm4 = Sm4()
+
+    if op == ENC:
+        sm4.sm4_set_key(unhexlify(key), ENCRYPT)
+    elif op == DEC:
+        sm4.sm4_set_key(unhexlify(key), DECRYPT)
+
+    if mode == 'ecb':
+        out = bytes.hex(bytes(sm4.sm4_crypt_ecb(
+            unhexlify(data))))
+    elif mode == 'cbc':
+        out = bytes.hex(bytes(sm4.sm4_crypt_cbc(
+            unhexlify(iv), unhexlify(data))))
+    elif mode == 'cfb':
+        out = bytes.hex(bytes(sm4.sm4_crypt_cfb(
+            unhexlify(iv), unhexlify(data))))
+    elif mode == 'ofb':
+        out = bytes.hex(bytes(sm4.sm4_crypt_ofb(
+            unhexlify(iv), unhexlify(data))))
+
+    return out
+
+
+def SymmCryptoDES(alg, mode, op, key, iv, data):
+    if alg == 'des':
+        des = pyDes.des
+    else:
+        des = pyDes.triple_des
+    if mode == 'ecb':
+        k = des(unhexlify(key), pyDes.ECB, None,
+                pad=None, padmode=pyDes.PAD_NORMAL)
+        if op == ENC:
+            out = bytes.hex(k.encrypt(unhexlify(data)))
+        elif op == DEC:
+            out = bytes.hex(k.decrypt(unhexlify(data)))
+
+    elif mode == 'cbc':
+        k = des(unhexlify(key), pyDes.CBC, unhexlify(
+            iv), pad=None, padmode=pyDes.PAD_NORMAL)
+        if op == ENC:
+            out = bytes.hex(k.encrypt(unhexlify(data)))
+        elif op == DEC:
+            out = bytes.hex(k.decrypt(unhexlify(data)))
+
+    elif mode == 'cfb':
+        out = ''
+        k = des(unhexlify(key), pyDes.ECB, None,
+                pad=None, padmode=pyDes.PAD_NORMAL)
+        ivb = unhexlify(iv)
+        for i in range(int(len(data) / 16)):
+            datab = unhexlify(data[i*16:(i+1)*16])
+            enciv = k.encrypt(ivb)
+            outb = [(p ^ x) for (p, x) in zip(datab, enciv)]
+            if op == ENC:
+                ivb = _bytes_to_string(outb)
+                out += bytes.hex(ivb)
+            elif op == DEC:
+                ivb = _bytes_to_string(datab)
+                out += bytes.hex(_bytes_to_string(outb))
+
+    elif mode == 'ofb':
+        out = ''
+        k = des(unhexlify(key), pyDes.ECB, None,
+                pad=None, padmode=pyDes.PAD_NORMAL)
+        ivb = unhexlify(iv)
+        for i in range(int(len(data) / 16)):
+            datab = unhexlify(data[i*16:(i+1)*16])
+            enciv = k.encrypt(ivb)
+            outb = [(p ^ x) for (p, x) in zip(datab, enciv)]
+            ivb = _bytes_to_string(enciv)
+            out += bytes.hex(_bytes_to_string(outb))
+
+    return out
+
+
 def SymmCryptoCompute(alg, mode, op, key, iv, data):
     if alg not in algList:
         return False, "algorithm does't support."
@@ -88,55 +235,17 @@ def SymmCryptoCompute(alg, mode, op, key, iv, data):
     if ret == False:
         return ret, message
 
-    out = ''
-
     if alg == 'aes':
-        if op == ENC:
-            for i in range(int(len(data) / 32)):
-                if mode == 'ecb':
-                    aes = pyaes.AESModeOfOperationECB(unhexlify(key))
-                elif mode == 'cbc':
-                    aes = pyaes.AESModeOfOperationCBC(
-                        unhexlify(key), unhexlify(iv))
-                iv = bytes.hex(aes.encrypt(unhexlify(data[i*32:(i+1)*32])))
-                out += iv
-        elif op == DEC:
-            for i in range(int(len(data) / 32)):
-                if mode == 'ecb':
-                    aes = pyaes.AESModeOfOperationECB(unhexlify(key))
-                elif mode == 'cbc':
-                    aes = pyaes.AESModeOfOperationCBC(
-                        unhexlify(key), unhexlify(iv))
-                iv = data[i*32:(i+1)*32]
-                out += bytes.hex(aes.decrypt(unhexlify(data[i*32:(i+1)*32])))
+        out = SymmCryptoAES(alg, mode, op, key, iv, data)
 
     elif alg == 'des' or alg == '3des2key' or alg == '3des3key':
-        if alg == 'des':
-            des = pyDes.des
-        else:
-            des = pyDes.triple_des
-        if mode == 'ecb':
-            k = des(unhexlify(key), pyDes.ECB, None,
-                    pad=None, padmode=pyDes.PAD_NORMAL)
-        elif mode == 'cbc':
-            k = des(unhexlify(key), pyDes.CBC, unhexlify(
-                iv), pad=None, padmode=pyDes.PAD_NORMAL)
-        if op == ENC:
-            out = bytes.hex(k.encrypt(unhexlify(data)))
-        elif op == DEC:
-            out = bytes.hex(k.decrypt(unhexlify(data)))
+        # if mode in ['cfb', 'ofb']:
+        #     return False, "des does't support " + mode + " now"
+        out = SymmCryptoDES(alg, mode, op, key, iv, data)
 
     elif alg == 'sm4':
-        sm4 = Sm4()
-        if op == ENC:
-            sm4.sm4_set_key(unhexlify(key), ENCRYPT)
-        elif op == DEC:
-            sm4.sm4_set_key(unhexlify(key), DECRYPT)
-        if mode == 'ecb':
-            out = bytes.hex(bytes(sm4.sm4_crypt_ecb(unhexlify(data))))
-        elif mode == 'cbc':
-            out = bytes.hex(bytes(sm4.sm4_crypt_cbc(
-                unhexlify(iv), unhexlify(data))))
+        out = SymmCryptoSM4(alg, mode, op, key, iv, data)
+
     return True, str(out)
 
 
@@ -144,9 +253,9 @@ class TextFrame(wx.Frame):
 
     def __init__(self, parent, title):
         super(TextFrame, self).__init__(parent, id=ID_ANY, title='Crypto Tool',
-                                        size=(800, 960))
+                                        size=(800, 700))
         self.InitStatusBar()
-        self.InitUI()        
+        self.InitUI()
         self.Centre()
         self.Show()
 
@@ -165,17 +274,17 @@ class TextFrame(wx.Frame):
 
         self.plainLabel = wx.StaticText(panel, label="明文:")
         self.plainText = wx.TextCtrl(
-            panel, size=(-1, 100), style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
+            panel, size=(-1, 80), style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
 
         self.cipherLabel = wx.StaticText(panel, label="密文:")
         self.cipherText = wx.TextCtrl(
-            panel, size=(-1, 100), style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
+            panel, size=(-1, 80), style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
 
         self.outdataLabel = wx.StaticText(panel, label="输出信息:")
         self.outdataText = wx.TextCtrl(
-            panel, size=(-1, 400), style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
+            panel, size=(-1, 160), style=wx.TE_CHARWRAP | wx.TE_MULTILINE)
 
-        fgs = wx.FlexGridSizer(6, 2, 9, 25)
+        fgs = wx.FlexGridSizer(5, 2, 9, 25)
         fgs.AddMany([(self.keyLabel), (self.keyText, 1, wx.EXPAND),
                      (self.ivLabel), (self.ivText, 1, wx.EXPAND),
                      (self.plainLabel), (self.plainText, 1, wx.EXPAND),
@@ -191,7 +300,7 @@ class TextFrame(wx.Frame):
         self.algChoice = wx.Choice(panel, choices=self.algList)
         self.algChoice.SetSelection(0)
 
-        self.modeList = ['ecb', 'cbc']
+        self.modeList = modeList
         self.modeLabel = wx.StaticText(panel, label="模式:")
         self.modeChoice = wx.Choice(panel, choices=self.modeList)
         self.modeChoice.SetSelection(0)
@@ -204,17 +313,14 @@ class TextFrame(wx.Frame):
         self.Bind(wx.EVT_BUTTON, self.OnClickDec, self.decButton)
         self.decButton.SetDefault()
 
-        choiceBox = wx.BoxSizer(wx.HORIZONTAL)
-        choiceBox.Add(self.algLabel, flag=wx.ALL, border=15)
-        choiceBox.Add(self.algChoice, flag=wx.ALL, border=15)
-        choiceBox.Add(self.modeLabel, flag=wx.ALL, border=15)
-        choiceBox.Add(self.modeChoice, flag=wx.ALL, border=15)
-        choiceBox.Add(self.encButton, flag=wx.ALL, border=15)
-        choiceBox.Add(self.decButton, flag=wx.ALL, border=15)
+        choicefgs = wx.FlexGridSizer(1, 6, 9, 16)
+        choicefgs.AddMany([(self.algLabel), (self.algChoice),
+                           (self.modeLabel), (self.modeChoice),
+                           (self.encButton), (self.decButton)])
 
         hbox = wx.BoxSizer(wx.VERTICAL)
         hbox.Add(fgs, proportion=1, flag=wx.ALL | wx.EXPAND, border=15)
-        hbox.Add(choiceBox, proportion=1, flag=wx.ALL | wx.EXPAND, border=15)
+        hbox.Add(choicefgs, proportion=0, flag=wx.ALL | wx.EXPAND, border=15)
 
         panel.SetSizer(hbox)
 
